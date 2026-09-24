@@ -222,3 +222,31 @@
   color: #b00020; cursor: pointer; font-size: 14px;
 }
 .empty { color: #9aa7a2; font-size: 12px; }
+
+@media (max-width: 640px) {
+  .calc-shell {
+    padding: 16px 12px 20px;
+  }
+
+  .calc-body {
+    gap: 14px;
+  }
+
+  .calc-display {
+    min-height: 172px;
+    padding: 12px 14px;
+  }
+
+  .keypad {
+    gap: 16px;
+  }
+
+  .key {
+    min-height: 45px;
+    font-size: 14px;
+  }
+
+  .keypad-row-4 .key {
+    min-height: 47px;
+  }
+}

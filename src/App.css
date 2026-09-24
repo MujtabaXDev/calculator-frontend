@@ -44,3 +44,25 @@ footer {
   color: #9da5ad;
   text-align: center;
 }
+
+@media (max-width: 640px) {
+  .app {
+    padding: 12px 10px 20px;
+  }
+
+  .app-header,
+  .history-panel,
+  .mode-panel {
+    display: none;
+  }
+
+  .app-main,
+  .calc-column {
+    display: block;
+  }
+
+  .calc-shell {
+    width: 100%;
+    max-width: none;
+  }
+}
