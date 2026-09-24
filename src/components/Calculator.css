@@ -1,0 +1,224 @@
+:root {
+  /* Manual colors: change these variables for the calculator palette. */
+  --calc-ink: #111214;
+  --calc-blue: #2f3238;
+  --calc-blue-light: #555b66;
+  --calc-teal: #70c9a5;
+  --calc-amber: #f6d43c;
+  --calc-coral: #e05252;
+  --calc-lcd: #cddccb;
+}
+
+.calc-shell {
+  /* Manual size: change max-width or padding to resize the whole calculator. */
+  background: linear-gradient(145deg, #343434, #111);
+  border: 1px solid #050505;
+  border-radius: 14px;
+  padding: 14px 18px 18px;
+  box-shadow: inset 0 0 0 1px #555, 0 12px 30px rgba(0,0,0,.3);
+  max-width: 420px;
+}
+.calc-body { display: flex; flex-direction: column; gap: 12px; }
+.calculator-brand { min-height: 42px; color: #d9d9d9; padding: 4px 6px 0; }
+.brand-name { color: #fff; font: italic 700 20px Georgia, serif; text-shadow: 0 2px 8px rgba(0,0,0,.35); }
+
+.calc-display {
+  /* Manual LCD size: change min-height for a taller or shorter display. */
+  position: relative;
+  background: #cddccb;
+  border: 4px solid #2b2b2b;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: 'Courier New', monospace;
+  min-height: 160px;
+  box-shadow: inset 0 0 12px rgba(35,70,45,.18);
+}
+.status-row {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #3f624e;
+  margin-bottom: 4px;
+}
+.status-row span { font-weight: 400 !important; opacity: .72; }
+.status-row span.active { font-weight: 700 !important; opacity: 1; color: #13766d; }
+.expr-line {
+  /* Manual typing size: change font-size for the expression being entered. */
+  font-size: 20px;
+  min-height: 24px;
+  word-break: break-all;
+  color: #152d27;
+}
+.natural-display { display: inline-block; color: inherit; vertical-align: middle; font-weight: 400; line-height: 1; }
+.expr-line .natural-display { font-size: 23px; } /* Manual typed-expression size. */
+.result-line .natural-display { font-size: 29px; } /* Manual answer size. */
+.natural-display .katex { color: inherit; }
+.natural-display .katex * { font-weight: 400; }
+.mixed-fraction { display: inline-flex; align-items: center; gap: 7px; line-height: 1; }
+.mixed-whole { display: inline-block; }
+.mixed-part { display: inline-flex; flex-direction: column; align-items: stretch; min-width: 24px; text-align: center; font-size: .78em; line-height: 1.05; }
+.mixed-rule { display: block; height: 1px; margin: 2px 0; background: currentColor; }
+.fraction-editor { display: inline-flex; flex-direction: column; min-width: 28px; min-height: 42px; justify-content: center; vertical-align: middle; font-size: 23px; line-height: 21px; text-align: center; }
+.fraction-part { display: block; min-width: 24px; min-height: 17px; padding: 0 4px; }
+.fraction-rule { display: block; height: 1px; min-width: 28px; background: currentColor; }
+.fraction-caret { display: inline-block; width: 1px; height: 16px; background: currentColor; vertical-align: middle; animation: blink 1s step-end infinite; }
+.fraction-placeholder { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 24px; height: 30px; vertical-align: middle; }
+.fraction-slot { width: 18px; height: 9px; border: 1px solid #7f9bb8; background: rgba(255, 255, 255, .2); }
+.fraction-bar { width: 22px; height: 1px; margin: 2px 0; background: #10240f; }
+.caret {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: #152d27;
+  animation: blink 1s step-end infinite;
+  vertical-align: middle;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.result-line {
+  /* Manual answer position: change bottom/right to move the result on the LCD. */
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  max-width: calc(100% - 24px);
+  text-align: right;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  color: #102d26;
+}
+.result-line.compact-result .natural-display { font-size: 20px; }
+.result-line.compact-result { white-space: nowrap; }
+.result-line.err { color: #a11; }
+
+.mode-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #172947;
+  color: #fff;
+  border-radius: 6px;
+  z-index: 5;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.mode-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+.mode-item:hover { background: #2c4d78; }
+
+.keypad {
+  /* Manual vertical spacing: change gap to add or remove space between rows. */
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.top-controls { display: grid; grid-template-columns: 58px 58px 86px 58px 58px; justify-content: space-between; gap: 0; align-items: center; margin: 0 6px 2px; }
+/* Manual top-button size: change these 58px values for SHIFT, ALPHA, MODE, and ON. */
+.top-controls > .key { width: 58px; min-height: 43px; }
+/* Manual replay-circle size: change width/height together to keep it circular. */
+.replay-pad { position: relative; width: 86px; height: 76px; justify-self: center; border-radius: 50%; background: linear-gradient(180deg, #3a3a42 0%, #232328 100%); box-shadow: 0 4px 0 #18181c, 0 6px 10px rgba(0,0,0,.5), inset 0 2px 3px rgba(255,255,255,.1), inset 0 -2px 4px rgba(0,0,0,.4); }
+.replay-pad button { position: absolute; border: 0; background: transparent; color: #e8f7ff; font-size: 10px; cursor: pointer; padding: 5px; z-index: 1; }
+.replay-up { top: 2px; left: 37px; }
+.replay-left { left: 7px; top: 31px; }
+.replay-right { right: 7px; top: 31px; }
+.replay-down { bottom: 2px; left: 37px; }
+.replay-center { position: absolute; width: 32px; height: 32px; left: 27px; top: 22px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #3f3f47, #18181c 80%); box-shadow: inset 0 2px 3px rgba(0,0,0,.6), 0 1px 1px rgba(255,255,255,.1); }
+.keypad-row { display: grid; gap: 6px; }
+.keypad-row-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.keypad-row-4 .key { min-height: 43px; }
+.keypad-row-5 { grid-template-columns: repeat(5, 1fr); }
+.keypad-row-6 { grid-template-columns: repeat(6, 1fr); }
+.key {
+  /* Manual keypad-button size: change min-height and padding for all buttons. */
+  position: relative;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(#3f4249, #25272c);
+  color: #eee;
+  padding: 9px 3px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 41px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+/* Manual button appearance: change gradients, shadows, or border-radius for the button style. */
+.key { box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 3px 6px rgba(7,18,38,.3); transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
+.key:hover { filter: brightness(1.14); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 5px 10px rgba(7,18,38,.35); }
+.key:active { transform: translateY(1px); filter: brightness(.96); }
+.calc-btn { background: linear-gradient(180deg, #4a4a52 0%, #2e2e34 100%); border: 1px solid #1a1a1e; border-top-color: #5c5c66; border-radius: 10px; box-shadow: 0 3px 0 #1a1a1e, 0 4px 6px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08); color: #e8e8ec; font-weight: 600; transition: all .1s ease; }
+.calc-btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 0 #1a1a1e, 0 5px 8px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12); }
+.calc-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #1a1a1e, 0 2px 3px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05); }
+.key.disabled { opacity: 0.35; cursor: not-allowed; }
+.top-label { position: absolute; top: -12px; left: 2px; right: 2px; font-size: 7px; color: #ff9d3d; white-space: nowrap; text-align: center; line-height: 9px; }
+.shift-label { position: absolute; top: 2px; left: 4px; font-size: 8px; color: #ffd166; }
+.alpha-label { position: absolute; top: 2px; right: 4px; font-size: 8px; color: #ff8e86; }
+.main-label { font-size: 13px; }
+
+/* Manual individual colors: edit these classes to change number, operator, function, and action buttons. */
+.k-num { background: linear-gradient(#fff, #d8dadd); color: #111; box-shadow: inset 0 -2px 0 #aaa; }
+.k-op { background: linear-gradient(#535b67, #30353c); }
+.k-fn { background: #2f3238; }
+.k-shift { background: linear-gradient(#ffe35a, #e5b91d); color: #222; }
+.k-alpha { background: linear-gradient(#ef6565, #c83e45); color: #fff; }
+.k-nav { background: #3d4a5c; }
+.k-on { background: #dfe3e6; color: #111; }
+.k-del, .k-ac { background: linear-gradient(#8dca4c, #4d9022); color: #12341c; }
+.k-eq { background: linear-gradient(#36a852, #168337); color: #092b1a; }
+
+.mode-panel, .history-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.mode-panel h3 { margin-top: 0; }
+.mode-panel .hint { font-size: 12px; color: #777; }
+.mode-panel input, .mode-panel select {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  margin: 4px 4px 4px 0;
+}
+.mode-panel button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #2f3542;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+.field-grid label { font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
+.matrix-grid { display: grid; gap: 6px; max-width: 260px; margin-bottom: 8px; }
+.matrix-grid input { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+.result-box { margin-top: 10px; font-weight: bold; font-size: 15px; }
+.result-table { border-collapse: collapse; margin-top: 10px; }
+.result-table td, .result-table th { border: 1px solid #ddd; padding: 6px 10px; text-align: left; font-size: 13px; }
+.error { color: #b00020; font-size: 13px; margin-top: 6px; }
+.error.small { font-size: 11px; }
+
+.history-panel { flex: 0 0 260px; max-height: 560px; overflow-y: auto; background: linear-gradient(145deg, #343434, #111); color: #e8edf1; border: 1px solid #555; }
+.history-header { display: flex; justify-content: space-between; align-items: center; }
+.history-header button {
+  border: 1px solid #111; background: linear-gradient(#3f4249, #25272c); color: #eee; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 12px;
+}
+.history-panel ul { list-style: none; padding: 0; margin: 8px 0 0; }
+.history-panel li {
+  position: relative;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 13px;
+}
+.hist-expr { color: #a8c9bc; font-family: monospace; }
+.hist-result { font-weight: bold; }
+.hist-del {
+  position: absolute; top: 6px; right: 4px; border: none; background: transparent;
+  color: #b00020; cursor: pointer; font-size: 14px;
+}
+.empty { color: #9aa7a2; font-size: 12px; }

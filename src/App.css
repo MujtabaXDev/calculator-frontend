@@ -1,0 +1,46 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 15% 10%, #34383d 0, transparent 34%), linear-gradient(135deg, #17191c, #292d32 58%, #111214);
+  color: #e8edf1;
+}
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px;
+}
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.app-header h1 { font-size: 20px; margin: 0; color: #f0f3f5; letter-spacing: .2px; }
+.header-actions button {
+  margin-left: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #3f4249, #25272c);
+  color: #fff;
+  cursor: pointer;
+}
+.app-main {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.calc-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 380px;
+}
+footer {
+  margin-top: 24px;
+  font-size: 12px;
+  color: #9da5ad;
+  text-align: center;
+}
