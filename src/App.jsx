@@ -1,14 +1,6 @@
 import React, { useState } from "react";
 import Calculator from "./components/Calculator";
 import History from "./components/History";
-import {
-  StatPanel,
-  EqnPanel,
-  MatrixPanel,
-  VectorPanel,
-  BaseNPanel,
-  TablePanel,
-} from "./components/ModePanels";
 import { saveHistory } from "./api";
 import "./components/Calculator.css";
 
@@ -48,12 +40,6 @@ export default function App() {
               onResult={handleResult}
             />
           </div>
-          {mode === "STAT" && <StatPanel />}
-          {mode === "EQN" && <EqnPanel />}
-          {mode === "MATRIX" && <MatrixPanel />}
-          {mode === "VECTOR" && <VectorPanel />}
-          {mode === "BASE-N" && <BaseNPanel />}
-          {mode === "TABLE" && <TablePanel mode={mode} angleUnit={angleUnit} />}
         </div>
         {showHistory && <History refreshKey={refreshKey} />}
       </div>

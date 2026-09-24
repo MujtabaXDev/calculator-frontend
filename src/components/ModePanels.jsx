@@ -300,14 +300,18 @@ export function MatrixPanel() {
           <option value="transpose">MatA^T</option>
         </select>
       </div>
-      <p className="hint">Matrix A</p>
-      <MatrixInput size={size} values={A} setValues={setA} />
-      {(op === "add" || op === "sub" || op === "mul") && (
-        <>
-          <p className="hint">Matrix B</p>
-          <MatrixInput size={size} values={B} setValues={setB} />
-        </>
-      )}
+      <div className="matrix-fields">
+        <div className="matrix-field">
+          <p className="hint">Matrix A</p>
+          <MatrixInput size={size} values={A} setValues={setA} />
+        </div>
+        {(op === "add" || op === "sub" || op === "mul") && (
+          <div className="matrix-field">
+            <p className="hint">Matrix B</p>
+            <MatrixInput size={size} values={B} setValues={setB} />
+          </div>
+        )}
+      </div>
       <button onClick={run}>Compute</button>
       {error && <div className="error">{error}</div>}
       {result && (
@@ -389,14 +393,18 @@ export function VectorPanel() {
           <option value="mag">|VctA|</option>
         </select>
       </div>
-      <p className="hint">Vector A</p>
-      {vecInput(a, setA)}
-      {(op === "add" || op === "sub" || op === "dot" || op === "cross") && (
-        <>
-          <p className="hint">Vector B</p>
-          {vecInput(b, setB)}
-        </>
-      )}
+      <div className="vector-fields">
+        <div className="vector-field">
+          <p className="hint">Vector A</p>
+          {vecInput(a, setA)}
+        </div>
+        {(op === "add" || op === "sub" || op === "dot" || op === "cross") && (
+          <div className="vector-field">
+            <p className="hint">Vector B</p>
+            {vecInput(b, setB)}
+          </div>
+        )}
+      </div>
       <button onClick={run}>Compute</button>
       {error && <div className="error">{error}</div>}
       {result && (
@@ -532,60 +540,67 @@ export function TablePanel({ mode, angleUnit }) {
 
   return (
     <div className="mode-panel">
-      <h3>TABLE — f(X) generator</h3>
-      <label>
-        f(X) = <input value={expr} onChange={(e) => setExpr(e.target.value)} />
-      </label>
-      <div className="row">
-        <label>
-          Start{" "}
-          <input
-            type="number"
-            value={start}
-            onChange={(e) => setStart(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          End{" "}
-          <input
-            type="number"
-            value={end}
-            onChange={(e) => setEnd(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Step{" "}
-          <input
-            type="number"
-            value={step}
-            onChange={(e) => setStep(Number(e.target.value))}
-          />
-        </label>
+      <div className="table-layout">
+        <h3>TABLE — f(X) generator</h3>
+        <div className="table-inputs">
+          <label>
+            f(X) ={" "}
+            <input value={expr} onChange={(e) => setExpr(e.target.value)} />
+          </label>
+          <div className="table-range">
+            <label>
+              Start{" "}
+              <input
+                type="number"
+                value={start}
+                onChange={(e) => setStart(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              End{" "}
+              <input
+                type="number"
+                value={end}
+                onChange={(e) => setEnd(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Step{" "}
+              <input
+                type="number"
+                value={step}
+                onChange={(e) => setStep(Number(e.target.value))}
+              />
+            </label>
+          </div>
+        </div>
+        <div className="table-output">
+          <button onClick={run}>Generate</button>
+          {error && <div className="error">{error}</div>}
+          {rows && (
+            <table className="result-table">
+              <thead>
+                <tr>
+                  <th>X</th>
+                  <th>f(X)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i}>
+                    <td>{r.x}</td>
+                    <td>
+                      {typeof r.y === "number"
+                        ? Math.round(r.y * 1e6) / 1e6
+                        : String(r.y)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-      <button onClick={run}>Generate</button>
-      {error && <div className="error">{error}</div>}
-      {rows && (
-        <table className="result-table">
-          <thead>
-            <tr>
-              <th>X</th>
-              <th>f(X)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i}>
-                <td>{r.x}</td>
-                <td>
-                  {typeof r.y === "number"
-                    ? Math.round(r.y * 1e6) / 1e6
-                    : String(r.y)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </div>
   );
 }

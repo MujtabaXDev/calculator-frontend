@@ -13,7 +13,7 @@ dist/
 dist-ssr/
 *.local
 
-# Environment
+# Environmentnpm
 .env
 .env.local
 .env.*.local

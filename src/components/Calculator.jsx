@@ -7,6 +7,14 @@ import {
   fractionToString,
   solveNewton,
 } from "../engine/engine";
+import {
+  StatPanel,
+  EqnPanel,
+  MatrixPanel,
+  VectorPanel,
+  BaseNPanel,
+  TablePanel,
+} from "./ModePanels";
 import { parse as parseMath, simplify } from "mathjs";
 
 const MODES = [
@@ -85,9 +93,7 @@ function displayExpression(value) {
     .replace(/\*10\^(-?\d+)/g, (_, exponent) => `×10${superscript(exponent)}`)
     .replace(/\*10\^/g, "×10ˣ")
     .replace(/\*/g, "×")
-    .replace(/\^\(-1\)/g, "⁻¹")
-    .replace(/\^3/g, "³")
-    .replace(/\^2/g, "²");
+    .replace(/\^(-?\d+)/g, (_, exponent) => superscript(exponent));
 }
 
 function scientificDisplay(value) {
@@ -256,6 +262,7 @@ export default function Calculator({
   const [error, setError] = useState(false);
 
   const complexMode = mode === "CMPLX";
+  const basicDisplayMode = mode === "COMP" || mode === "CMPLX";
 
   function insert(text) {
     const newExpr = expr.slice(0, cursor) + text + expr.slice(cursor);
@@ -295,6 +302,16 @@ export default function Calculator({
     onResult && onResult(entry);
   }
 
+  function classifyError(expr, error) {
+    const msg = String(error?.message || error || "");
+    const hasLetter = /[A-Za-z]/.test(expr);
+    const isVariableIssue =
+      /(Undefined symbol|Unknown symbol|is not defined|not defined|Variable)/i.test(
+        msg,
+      ) || /\b(?:A|B|C|D|E|F|X|Y|Z|a|b|c|d|e|f|x|y|z)\b/.test(expr);
+    return hasLetter && isVariableIssue ? "Variable Error" : "Math ERROR";
+  }
+
   function doEvaluate() {
     try {
       const clean = preprocess(expr || "0");
@@ -314,7 +331,7 @@ export default function Calculator({
       setError(false);
       pushHistory(expr, shown);
     } catch (e) {
-      setDisplay("Math ERROR");
+      setDisplay(classifyError(clean, e));
       setError(true);
     }
   }
@@ -334,7 +351,7 @@ export default function Calculator({
       pushHistory(`SOLVE: ${expr}`, root);
       setError(false);
     } catch (e) {
-      setDisplay("Can't Solve");
+      setDisplay(classifyError(target, e));
       setError(true);
     }
   }
@@ -608,12 +625,26 @@ export default function Calculator({
     return () => window.removeEventListener("keydown", handleKeyboard);
   });
 
+  function renderModePanel() {
+    if (mode === "STAT") return <StatPanel />;
+    if (mode === "EQN") return <EqnPanel />;
+    if (mode === "MATRIX") return <MatrixPanel />;
+    if (mode === "VECTOR") return <VectorPanel />;
+    if (mode === "BASE-N") return <BaseNPanel />;
+    if (mode === "TABLE") {
+      return <TablePanel mode={mode} angleUnit={angleUnit} />;
+    }
+    return null;
+  }
+
   const rows = [
     [
       {
         id: "CALC",
         main: "CALC",
         shift: "SOLVE",
+        alpha: "=",
+        alphaLabel: "= ",
         cls: "k-fn calc-btn",
         topLabel: "SOLVE",
       },
@@ -713,6 +744,8 @@ export default function Calculator({
         main: "hyp",
         topLabel: "Abs",
         shiftAction: () => insert("abs("),
+        alpha: "C",
+        alphaLabel: "[C]",
         cls: "k-fn",
       },
       {
@@ -769,13 +802,15 @@ export default function Calculator({
         main: "eng",
         shift: "i",
         topLabel: "←",
-        shiftAction: () => setCursor((c) => Math.max(0, c - 1)),
+        shiftAction: () =>
+          complexMode ? insert("i") : setCursor((c) => Math.max(0, c - 1)),
         cls: "k-fn",
         label: "ENG",
       },
       {
         id: "LP",
-        main: "( ",
+        main: "(",
+        label: "(",
         topLabel: "%",
         shiftAction: () => insert("/100"),
         cls: "k-fn",
@@ -786,9 +821,18 @@ export default function Calculator({
         topLabel: ",",
         shiftAction: () => insert(","),
         alpha: "X",
+        alphaLabel: "[X]",
         cls: "k-fn",
       },
-      { id: "SD", main: "", topLabel: "a b/c", cls: "k-fn", label: "S⇔D" },
+      {
+        id: "SD",
+        main: "",
+        topLabel: "a b/c",
+        alpha: "Y",
+        alphaLabel: "[Y]",
+        cls: "k-fn",
+        label: "S⇔D",
+      },
       {
         id: "MPLUS",
         main: "",
@@ -978,7 +1022,13 @@ export default function Calculator({
           ),
         cls: "k-fn",
       },
-      { id: "EQ", main: "", cls: "k-eq", label: "=" },
+      {
+        id: "EQ",
+        main: "",
+        cls: "k-eq",
+        label: "=",
+        alpha: "=",
+      },
     ],
   ];
 
@@ -987,7 +1037,9 @@ export default function Calculator({
       <div className="calculator-brand">
         <div className="brand-name">fx-991ES PLUS</div>
       </div>
-      <div className="calc-display">
+      <div
+        className={`calc-display ${!basicDisplayMode ? "mode-expanded" : ""}`}
+      >
         <div className="status-row">
           <span className={shiftActive ? "active" : ""}>S</span>
           <span className={alphaActive ? "active" : ""}>A</span>
@@ -996,22 +1048,29 @@ export default function Calculator({
           <span>{angleUnit}</span>
           {M !== 0 && <span className="active">M</span>}
         </div>
-        <div className="expr-line">
-          {expr.includes("/") ? (
-            <FractionExpression value={expr} cursor={cursor} />
-          ) : (
-            <>
-              <NaturalDisplay value={expr.slice(0, cursor)} />
-              <span className="caret" />
-              <NaturalDisplay value={expr.slice(cursor)} />
-            </>
-          )}
-        </div>
-        <div
-          className={`result-line ${error ? "err" : ""} ${String(display).length > 12 ? "compact-result" : ""}`}
-        >
-          <NaturalDisplay value={display} isResult />
-        </div>
+        {basicDisplayMode && (
+          <>
+            <div className="expr-line">
+              {expr.includes("/") ? (
+                <FractionExpression value={expr} cursor={cursor} />
+              ) : (
+                <>
+                  <NaturalDisplay value={expr.slice(0, cursor)} />
+                  <span className="caret" />
+                  <NaturalDisplay value={expr.slice(cursor)} />
+                </>
+              )}
+            </div>
+            <div
+              className={`result-line ${error ? "err" : ""} ${String(display).length > 12 ? "compact-result" : ""}`}
+            >
+              <NaturalDisplay value={display} isResult />
+            </div>
+          </>
+        )}
+        {!basicDisplayMode && (
+          <div className="calc-mode-inline-panel">{renderModePanel()}</div>
+        )}
         {showMenu && (
           <div className="mode-overlay">
             {MODES.map((m) => (
@@ -1063,38 +1122,42 @@ export default function Calculator({
         </button>
       </div>
       <div className="keypad">
-        {rows.map((row, rowIndex) => (
-          <div
-            className={`keypad-row keypad-row-${row.length}`}
-            key={`row-${rowIndex}`}
-          >
-            {row.map((btn) => (
-              <button
-                key={btn.id}
-                className={`key ${btn.cls || ""} ${btn.disabled ? "disabled" : ""}`}
-                disabled={btn.disabled}
-                onClick={() => press(btn)}
-              >
-                {btn.topLabel && (
-                  <span className="top-label">{btn.topLabel}</span>
-                )}
-                {btn.shiftLabel && (
-                  <span className="shift-label">{btn.shiftLabel}</span>
-                )}
-                {btn.alphaLabel && (
-                  <span className="alpha-label">{btn.alphaLabel}</span>
-                )}
-                <span className="main-label">
-                  {btn.label !== undefined
-                    ? btn.label
-                    : btn.main === ""
-                      ? btn.id
-                      : btn.main.replace(/\($/, "")}
-                </span>
-              </button>
-            ))}
-          </div>
-        ))}
+        {rows
+          .filter(
+            (row) => basicDisplayMode || (row.length !== 4 && row.length !== 6),
+          )
+          .map((row, rowIndex) => (
+            <div
+              className={`keypad-row keypad-row-${row.length}`}
+              key={`row-${rowIndex}`}
+            >
+              {row.map((btn) => (
+                <button
+                  key={btn.id}
+                  className={`key ${btn.cls || ""} ${btn.disabled ? "disabled" : ""}`}
+                  disabled={btn.disabled}
+                  onClick={() => press(btn)}
+                >
+                  {btn.topLabel && (
+                    <span className="top-label">{btn.topLabel}</span>
+                  )}
+                  {btn.shiftLabel && (
+                    <span className="shift-label">{btn.shiftLabel}</span>
+                  )}
+                  {btn.alphaLabel && (
+                    <span className="alpha-label">{btn.alphaLabel}</span>
+                  )}
+                  <span className="main-label">
+                    {btn.label !== undefined
+                      ? btn.label
+                      : btn.main === ""
+                        ? btn.id
+                        : btn.main.replace(/\($/, "")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))}
       </div>
     </div>
   );

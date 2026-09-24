@@ -19,39 +19,63 @@
   max-width: 420px;
 }
 .calc-body { display: flex; flex-direction: column; gap: 12px; }
-.calculator-brand { min-height: 42px; color: #d9d9d9; padding: 4px 6px 0; }
-.brand-name { color: #fff; font: italic 700 20px Georgia, serif; text-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.calculator-brand {
+  min-height: 42px;
+  color: #d9d9d9;
+  padding: 4px 6px 0;
+}
+.brand-name {
+  color: #fff;
+  font: italic 700 20px Georgia, serif;
+  text-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
 
 .calc-display {
   /* Manual LCD size: change min-height for a taller or shorter display. */
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: #cddccb;
   border: 4px solid #2b2b2b;
   border-radius: 6px;
   padding: 10px 12px;
   font-family: 'Courier New', monospace;
   min-height: 160px;
+  height: 160px;
+  max-height: 160px;
   box-shadow: inset 0 0 12px rgba(35,70,45,.18);
+  color: #101010;
+  overflow: visible;
+}
+
+.calc-display.mode-expanded {
+  min-height: 390px;
+  height: auto;
+  max-height: none;
+  overflow: visible;
 }
 .status-row {
   display: flex;
   gap: 8px;
   font-size: 10px;
-  color: #3f624e;
+  color: #2a2a2a;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
-.status-row span { font-weight: 400 !important; opacity: .72; }
-.status-row span.active { font-weight: 700 !important; opacity: 1; color: #13766d; }
+.status-row span { font-weight: 700 !important; opacity: .78; }
+.status-row span.active { font-weight: 700 !important; opacity: 1; color: #111; }
 .expr-line {
   /* Manual typing size: change font-size for the expression being entered. */
   font-size: 20px;
   min-height: 24px;
+  flex: 1;
   word-break: break-all;
-  color: #152d27;
+  color: #101010;
 }
-.natural-display { display: inline-block; color: inherit; vertical-align: middle; font-weight: 400; line-height: 1; }
-.expr-line .natural-display { font-size: 23px; } /* Manual typed-expression size. */
-.result-line .natural-display { font-size: 29px; } /* Manual answer size. */
+.natural-display { display: inline-block; color: #101010; vertical-align: middle; font-weight: 700; line-height: 1; }
+.expr-line .natural-display { font-size: 21px; } /* Manual typed-expression size. */
+.result-line .natural-display { font-size: 24px; } /* Manual answer size. */
+.result-line.err .natural-display { font-size: 20px; } /* Smaller medium error text for variable / math issues. */
 .natural-display .katex { color: inherit; }
 .natural-display .katex * { font-weight: 400; }
 .mixed-fraction { display: inline-flex; align-items: center; gap: 7px; line-height: 1; }
@@ -76,36 +100,76 @@
 @keyframes blink { 50% { opacity: 0; } }
 .result-line {
   /* Manual answer position: change bottom/right to move the result on the LCD. */
-  position: absolute;
-  right: 12px;
-  bottom: 8px;
-  max-width: calc(100% - 24px);
+  position: static;
+  max-width: 100%;
   text-align: right;
   font-size: 22px;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 1;
   margin: 0;
   padding: 0;
-  color: #102d26;
+  color: #101010;
+  margin-top: auto;
+  flex-shrink: 0;
 }
-.result-line.compact-result .natural-display { font-size: 20px; }
+.result-line.compact-result .natural-display { font-size: 18px; }
 .result-line.compact-result { white-space: nowrap; }
-.result-line.err { color: #a11; }
+.result-line.err { color: #8a1111; }
+
+/* Control this panel's vertical height with height, min-height, or max-height below. */
+.calc-mode-inline-panel {
+  position: relative;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(16, 16, 16, 0.25);
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.calc-display.mode-expanded .calc-mode-inline-panel {
+  max-height: none;
+}
+
+.calc-display.mode-expanded .mode-panel {
+  min-height: 100%;
+  margin: 0;
+  padding: 8px;
+  background: transparent;
+  color: #101010;
+  border-radius: 0;
+  box-shadow: none;
+}
 
 .mode-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: #172947;
-  color: #fff;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  width: min(210px, calc(100% - 8px));
+  background: linear-gradient(180deg, #d8e0ea 0%, #b8c7d7 100%);
+  color: #1a2433;
+  border: 2px solid #3e4d60;
   border-radius: 6px;
-  z-index: 5;
+  box-shadow: 0 10px 22px rgba(0,0,0,.28);
+  z-index: 30;
   max-height: 220px;
   overflow-y: auto;
+  padding: 6px 8px;
 }
-.mode-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
-.mode-item:hover { background: #2c4d78; }
+.mode-item {
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.1;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.mode-item:hover { background: rgba(31, 62, 94, 0.12); }
 
 .keypad {
   /* Manual vertical spacing: change gap to add or remove space between rows. */
@@ -194,7 +258,22 @@
 }
 .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
 .field-grid label { font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
-.matrix-grid { display: grid; gap: 6px; max-width: 260px; margin-bottom: 8px; }
+.vector-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.vector-field .row { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.vector-field .row input { min-width: 0; width: 100%; box-sizing: border-box; }
+.vector-field .hint { margin-bottom: 6px; }
+.table-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 16px; align-items: start; }
+.table-layout h3 { grid-column: 1 / -1; }
+.table-inputs label { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.table-inputs input { width: 100%; box-sizing: border-box; }
+.table-range { display: grid; gap: 2px; }
+.table-output { min-width: 0; }
+.table-output > button { margin-top: 0; }
+.table-output .result-table { margin-top: 10px; width: 100%; }
+.matrix-fields { display: flex; gap: 18px; max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+.matrix-field { flex: 0 0 auto; }
+.matrix-field .hint { margin-bottom: 6px; }
+.matrix-grid { display: grid; gap: 6px; max-width: 260px; margin-bottom: 2px; }
 .matrix-grid input { width: 100%; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
 .result-box { margin-top: 10px; font-weight: bold; font-size: 15px; }
