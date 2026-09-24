@@ -7,9 +7,10 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   server: {
+    host: "0.0.0.0",
     port: 5173,
     proxy: {
-      "/api": "http://localhost:5000",
+      "/api": "https://mern-scientific-calculator-server.vercel.app",
     },
   },
 });
