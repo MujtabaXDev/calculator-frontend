@@ -39,7 +39,6 @@ function preprocess(expr) {
     guard++;
   } while (out !== prev && guard < 10);
 
-  // Implicit multiplication: "5sqrt(9)" → "5*sqrt(9)", "(2)(3)" → "(2)*(3)"
   out = out.replace(/\)\s*(?=[A-Za-z\d(])/g, ")*");
   out = out.replace(
     /(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)\s*(?=[A-Za-z(])/g,
@@ -99,6 +98,7 @@ function displayExpression(value) {
     .replace(/exp\(/g, "eˣ(")
     .replace(/\*10\^(-?\d+)/g, (_, exponent) => `×10${superscript(exponent)}`)
     .replace(/\*10\^/g, "×10ˣ")
+    .replace(/·/g, "×")
     .replace(/\*/g, "×")
     .replace(/\^(-?\d+)/g, (_, exponent) => superscript(exponent));
 }
@@ -134,14 +134,15 @@ function scientificDisplay(value) {
 
 function NaturalDisplay({ value, className = "", isResult = false }) {
   if (!value) return null;
+  const norm = typeof value === "string" ? value.replace(/·/g, "*") : value;
   if (!isResult) {
     return (
       <span className={`natural-display ${className}`}>
-        {displayExpression(value)}
+        {displayExpression(norm)}
       </span>
     );
   }
-  const mixedFraction = String(value)
+  const mixedFraction = String(norm)
     .trim()
     .match(/^(-?\d+)\s+(\d+)\/(\d+)$/);
   if (mixedFraction) {
@@ -157,7 +158,7 @@ function NaturalDisplay({ value, className = "", isResult = false }) {
       </span>
     );
   }
-  if (value === "/") {
+  if (norm === "/") {
     return (
       <span className={`natural-display fraction-placeholder ${className}`}>
         <span className="fraction-slot" />
@@ -166,7 +167,7 @@ function NaturalDisplay({ value, className = "", isResult = false }) {
       </span>
     );
   }
-  const numericValue = String(value).trim();
+  const numericValue = String(norm).trim();
   if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(numericValue)) {
     const scientificValue = scientificDisplay(numericValue);
     return (
@@ -176,25 +177,25 @@ function NaturalDisplay({ value, className = "", isResult = false }) {
     );
   }
   if (
-    /[+\-*/^,(]$/.test(String(value).trim()) ||
-    /\*(?!10\^)/.test(String(value)) ||
-    /\*10\^/.test(String(value))
+    /[+\-*/^,(]$/.test(String(norm).trim()) ||
+    /\*(?!10\^)/.test(String(norm)) ||
+    /\*10\^/.test(String(norm))
   ) {
     return (
       <span className={`natural-display ${className}`}>
-        {displayExpression(value)}
+        {displayExpression(norm)}
       </span>
     );
   }
-  if (/\b(?:asin|acos|atan)\(/.test(String(value))) {
+  if (/\b(?:asin|acos|atan)\(/.test(String(norm))) {
     return (
       <span className={`natural-display ${className}`}>
-        {displayExpression(value)}
+        {displayExpression(norm)}
       </span>
     );
   }
   try {
-    const tex = parseMath(String(value)).toTex({ parenthesis: "keep" });
+    const tex = parseMath(String(norm)).toTex({ parenthesis: "keep" });
     return (
       <span
         className={`natural-display ${className}`}
@@ -209,7 +210,7 @@ function NaturalDisplay({ value, className = "", isResult = false }) {
   } catch {
     return (
       <span className={`natural-display ${className}`}>
-        {displayExpression(value)}
+        {displayExpression(norm)}
       </span>
     );
   }
@@ -238,43 +239,16 @@ function matchParenForward(expr, start) {
   return -1;
 }
 
+// `·` behaves like `*` for unary detection (so `6·-3` treats the `-` as
+// a unary sign, not a binary subtraction).
 function isUnaryAt(expr, i) {
   if (i <= 0) return true;
   const prev = expr[i - 1];
-  return "+-*/^(,".includes(prev);
+  return "+-*/^(,·".includes(prev);
 }
 
-function findOperandStart(expr, end) {
-  let i = end;
-  if (i <= 0) return -1;
-  if (expr[i - 1] === ")") {
-    let depth = 0;
-    let j = i - 1;
-    for (; j >= 0; j--) {
-      if (expr[j] === ")") depth++;
-      else if (expr[j] === "(") {
-        depth--;
-        if (depth === 0) break;
-      }
-    }
-    if (j < 0) return -1;
-    while (j > 0 && isIdentChar(expr[j - 1])) j--;
-    return j;
-  }
-  let j = i;
-  while (
-    j > 0 &&
-    (isDigitChar(expr[j - 1]) ||
-      expr[j - 1] === "." ||
-      isIdentChar(expr[j - 1]))
-  ) {
-    j--;
-  }
-  if (j === i) return -1;
-  if (j > 0 && expr[j - 1] === "-" && isUnaryAt(expr, j - 1)) j--;
-  return j;
-}
-
+// Denominator scan. Stops at top-level `*`, `+`, `-`. Does NOT stop at `/`
+// (chained divisions nest) or at `·` (denominator-internal multiply).
 function findDenominatorEnd(expr, start) {
   let depth = 0;
   for (let i = start; i < expr.length; i++) {
@@ -310,18 +284,28 @@ function findTopLevelAddSub(expr) {
   return -1;
 }
 
-function findTopLevelMulDiv(expr) {
+function findLeftmostTopLevelDivision(expr) {
   let depth = 0;
   for (let i = 0; i < expr.length; i++) {
     const ch = expr[i];
     if (ch === "(") depth++;
     else if (ch === ")") {
       if (depth > 0) depth--;
-    } else if (depth === 0 && (ch === "*" || ch === "/")) {
-      return { index: i, op: ch };
-    }
+    } else if (depth === 0 && ch === "/") return i;
   }
-  return null;
+  return -1;
+}
+
+function findLeftmostTopLevelMul(expr) {
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      if (depth > 0) depth--;
+    } else if (depth === 0 && ch === "*") return i;
+  }
+  return -1;
 }
 
 function tokenizeFactor(expr, offset) {
@@ -424,78 +408,98 @@ function tokenizeExpression(expr, offset = 0) {
     ]);
   }
 
-  const mulDiv = findTopLevelMulDiv(expr);
-  if (mulDiv && mulDiv.op === "/") {
-    let numStart = findOperandStart(expr, mulDiv.index);
-    if (numStart === -1) numStart = mulDiv.index;
-    const denEnd = findDenominatorEnd(expr, mulDiv.index + 1);
+  // Prioritise "/" over "*". Numerator is everything from the start of
+  // this sub-expression up to the leftmost top-level "/".
+  const divIdx = findLeftmostTopLevelDivision(expr);
+  if (divIdx !== -1) {
+    const numStart = 0;
+    const numEnd = divIdx;
+    const denStart = divIdx + 1;
+    const denEnd = findDenominatorEnd(expr, denStart);
     const numerator = tokenizeExpression(
-      expr.slice(numStart, mulDiv.index),
+      expr.slice(numStart, numEnd),
       offset + numStart,
     );
     const denominator = tokenizeExpression(
-      expr.slice(mulDiv.index + 1, denEnd),
-      offset + mulDiv.index + 1,
+      expr.slice(denStart, denEnd),
+      offset + denStart,
     );
     return mergeAdjacentText([
-      ...tokenizeExpression(expr.slice(0, numStart), offset),
       {
         type: "fraction",
         start: offset + numStart,
         end: offset + denEnd,
         numStart: offset + numStart,
-        numEnd: offset + mulDiv.index,
-        denStart: offset + mulDiv.index + 1,
+        numEnd: offset + numEnd,
+        denStart: offset + denStart,
         denEnd: offset + denEnd,
         numerator,
         denominator,
       },
       ...tokenizeExpression(expr.slice(denEnd), offset + denEnd),
     ]);
-  } else if (mulDiv && mulDiv.op === "*") {
+  }
+
+  const mulIdx = findLeftmostTopLevelMul(expr);
+  if (mulIdx !== -1) {
     return mergeAdjacentText([
-      ...tokenizeExpression(expr.slice(0, mulDiv.index), offset),
+      ...tokenizeExpression(expr.slice(0, mulIdx), offset),
       {
         type: "text",
-        start: offset + mulDiv.index,
-        end: offset + mulDiv.index + 1,
+        start: offset + mulIdx,
+        end: offset + mulIdx + 1,
         value: "*",
       },
-      ...tokenizeExpression(
-        expr.slice(mulDiv.index + 1),
-        offset + mulDiv.index + 1,
-      ),
+      ...tokenizeExpression(expr.slice(mulIdx + 1), offset + mulIdx + 1),
     ]);
   }
 
   return mergeAdjacentText(tokenizeFactor(expr, offset));
 }
 
-// Find the token the caret belongs to. Primary: strict half-open containment
-// (`start <= cursor < end`). Fallback: an empty-denominator fraction whose
-// blank denominator slot sits at exactly `cursor` — this is what lets DOWN
-// drop the caret into a blank denominator instead of escaping past the
-// fraction to a trailing position.
-function findCaretIndex(items, cursor) {
-  if (items.length === 0) return -1;
-  const strict = items.findIndex((t) => cursor >= t.start && cursor < t.end);
-  if (strict !== -1) return strict;
-  for (let i = items.length - 1; i >= 0; i--) {
-    const t = items[i];
-    if (
-      t.type === "fraction" &&
-      t.denStart === t.denEnd &&
-      cursor === t.denStart
-    ) {
-      return i;
+// Rebuilds a plain mathjs-compatible string with parens around every
+// fraction's numerator and denominator — this preserves denominator
+// grouping (e.g. `88*6555/6·34` → `(88*6555)/(6*34)`), and converts `·`
+// back into `*` for the evaluator.
+function serializeForEval(tokens) {
+  let out = "";
+  for (const tok of tokens) {
+    if (tok.type === "text") {
+      out += tok.value.replace(/·/g, "*");
+    } else {
+      const n = serializeForEval(tok.numerator);
+      const d = serializeForEval(tok.denominator);
+      out += `(${n})/(${d})`;
     }
   }
-  return -1;
+  return out;
 }
 
-function RenderItems({ items, cursor, caretClass = "caret" }) {
+// `forceDenEnd = true` → at a denEnd, route the caret INTO the denominator
+// (bottom-right). `false` → route to the top-level slot (middle height).
+function findCaretIndex(items, cursor, forceDenEnd) {
+  if (items.length === 0) return -1;
+
+  if (forceDenEnd) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const t = items[i];
+      if (t.type === "fraction" && cursor === t.denEnd) return i;
+    }
+  }
+
+  return items.findIndex((t) => cursor >= t.start && cursor < t.end);
+}
+
+function RenderItems({
+  items,
+  cursor,
+  caretClass = "caret",
+  forceDenEnd = false,
+}) {
   const hasCursor = cursor !== null && cursor !== undefined;
-  const caretIndex = hasCursor ? findCaretIndex(items, cursor) : -1;
+  const caretIndex = hasCursor
+    ? findCaretIndex(items, cursor, forceDenEnd)
+    : -1;
   const renderTrailingCaret =
     hasCursor && caretIndex === -1 && items.length > 0;
 
@@ -525,6 +529,7 @@ function RenderItems({ items, cursor, caretClass = "caret" }) {
                 items={tok.numerator}
                 cursor={numCursor}
                 caretClass="fraction-caret"
+                forceDenEnd={forceDenEnd}
               />
             </span>
             <span className="fraction-rule" />
@@ -533,6 +538,7 @@ function RenderItems({ items, cursor, caretClass = "caret" }) {
                 items={tok.denominator}
                 cursor={denCursor}
                 caretClass="fraction-caret"
+                forceDenEnd={forceDenEnd}
               />
             </span>
           </span>
@@ -544,9 +550,16 @@ function RenderItems({ items, cursor, caretClass = "caret" }) {
   );
 }
 
-function ExpressionDisplay({ expr, cursor }) {
+function ExpressionDisplay({ expr, cursor, forceDenEnd }) {
   const tokens = tokenizeExpression(expr);
-  return <RenderItems items={tokens} cursor={cursor} caretClass="caret" />;
+  return (
+    <RenderItems
+      items={tokens}
+      cursor={cursor}
+      caretClass="caret"
+      forceDenEnd={forceDenEnd}
+    />
+  );
 }
 
 function findDeepestFraction(items, cursor, containsFn) {
@@ -562,12 +575,19 @@ function findDeepestFraction(items, cursor, containsFn) {
   return null;
 }
 
-function endsWithCompletedFraction(expr) {
+function hasFractionWithDenEnd(items, pos) {
+  for (const t of items) {
+    if (t.type !== "fraction") continue;
+    if (t.denEnd === pos) return true;
+    if (hasFractionWithDenEnd(t.numerator, pos)) return true;
+    if (hasFractionWithDenEnd(t.denominator, pos)) return true;
+  }
+  return false;
+}
+
+function cursorIsAtDenEnd(expr, pos) {
   if (!expr) return false;
-  const tokens = tokenizeExpression(expr);
-  const last = tokens[tokens.length - 1];
-  if (!last || last.type !== "fraction") return false;
-  return last.end === expr.length && last.denEnd > last.denStart;
+  return hasFractionWithDenEnd(tokenizeExpression(expr), pos);
 }
 
 export default function Calculator({
@@ -579,6 +599,7 @@ export default function Calculator({
 }) {
   const [expr, setExpr] = useState("");
   const [cursor, setCursor] = useState(0);
+  const [forceDenEnd, setForceDenEnd] = useState(false);
   const [display, setDisplay] = useState("0");
   const [Ans, setAns] = useState(0);
   const [M, setM] = useState(0);
@@ -595,13 +616,13 @@ export default function Calculator({
   const basicDisplayMode = mode === "COMP" || mode === "CMPLX";
 
   function insert(text) {
+    // When the caret is at forceDenEnd, a "*" from the keypad should stay
+    // INSIDE the denominator. We encode that intent by inserting "·"
+    // instead — the tokenizer treats "·" as a non-terminating multiply.
+    let actualText = text;
+    if (text === "*" && forceDenEnd) actualText = "·";
+
     let implicit = "";
-    // If the user types a letter (start of a function name like sqrt, sin, ln)
-    // right after a completed fraction at the end of the expression, insert
-    // an implicit "*" so the function becomes a SEPARATE operand instead of
-    // extending the denominator:
-    //   "77/88" + "sqrt("  →  "77/88*sqrt("   → displays 77/88 × √(
-    //   "77/88" + "8"      →  "77/888"        → digits still extend denom
     if (cursor === expr.length && expr.length > 0 && /^[A-Za-z]/.test(text)) {
       const tokens = tokenizeExpression(expr);
       const last = tokens[tokens.length - 1];
@@ -611,24 +632,41 @@ export default function Calculator({
         last.end === expr.length &&
         last.denEnd > last.denStart
       ) {
-        implicit = "*";
+        const denText = last.denominator
+          .map((x) => (x.type === "text" ? x.value : ""))
+          .join("");
+        let depth = 0;
+        for (const ch of denText) {
+          if (ch === "(") depth++;
+          else if (ch === ")") depth--;
+        }
+        const stillTyping = depth !== 0 || /[+\-*/^(,·]$/.test(denText);
+        if (!stillTyping) {
+          implicit = forceDenEnd ? "·" : "*";
+        }
       }
     }
     const newExpr =
-      expr.slice(0, cursor) + implicit + text + expr.slice(cursor);
+      expr.slice(0, cursor) + implicit + actualText + expr.slice(cursor);
+    const newCursor = cursor + implicit.length + actualText.length;
     setExpr(newExpr);
-    setCursor(cursor + implicit.length + text.length);
+    setCursor(newCursor);
+    setForceDenEnd(cursorIsAtDenEnd(newExpr, newCursor));
   }
 
   function backspace() {
     if (cursor === 0) return;
-    setExpr(expr.slice(0, cursor - 1) + expr.slice(cursor));
-    setCursor(cursor - 1);
+    const newExpr = expr.slice(0, cursor - 1) + expr.slice(cursor);
+    const newCursor = cursor - 1;
+    setExpr(newExpr);
+    setCursor(newCursor);
+    setForceDenEnd(cursorIsAtDenEnd(newExpr, newCursor));
   }
 
   function clearAll() {
     setExpr("");
     setCursor(0);
+    setForceDenEnd(false);
     setDisplay("0");
     setError(false);
   }
@@ -656,9 +694,6 @@ export default function Calculator({
     const msg = String(error?.message || error || "");
     const src = String(expr || "");
 
-    // --- 1) Syntax errors ------------------------------------------------
-    // Either the engine complained about structure, OR the raw expression
-    // is obviously incomplete (unbalanced parens, dangling operator, ...).
     const engineSaysSyntax =
       /(Unexpected end|Unexpected operator|Unexpected part|Unexpected type|Parenthesis|Value expected|Character .* is not allowed|Syntax|Unexpected token|Value expected)/i.test(
         msg,
@@ -669,9 +704,9 @@ export default function Calculator({
       for (const ch of src) {
         if (ch === "(") depth++;
         else if (ch === ")") depth--;
-        if (depth < 0) return true; // stray ")"
+        if (depth < 0) return true;
       }
-      return depth !== 0; // unclosed "("
+      return depth !== 0;
     })();
 
     const endsWithOperator = /[+\-*/^(,]$/.test(src.trim());
@@ -689,7 +724,6 @@ export default function Calculator({
       return "Syntax ERROR";
     }
 
-    // --- 2) Variable errors ---------------------------------------------
     const hasLetter = /[A-Za-z]/.test(src);
     const isVariableIssue =
       /(Undefined symbol|Unknown symbol|is not defined|not defined|Variable)/i.test(
@@ -697,15 +731,15 @@ export default function Calculator({
       ) || /\b(?:A|B|C|D|E|F|X|Y|Z|a|b|c|d|e|f|x|y|z)\b/.test(src);
     if (hasLetter && isVariableIssue) return "Variable Error";
 
-    // --- 3) Everything else ---------------------------------------------
-    // Divide by zero, domain errors (sqrt(-1), log(0), ...), overflow, etc.
     return "Math ERROR";
   }
 
   function doEvaluate() {
     let clean;
     try {
-      clean = preprocess(expr || "0");
+      const tokens = tokenizeExpression(expr || "");
+      const serialized = serializeForEval(tokens) || "0";
+      clean = preprocess(serialized);
       const result = calcEvaluate(clean, {
         mode: angleUnit,
         complexMode,
@@ -730,10 +764,15 @@ export default function Calculator({
   function doSolve() {
     let target;
     try {
-      target = expr;
-      if (target.includes("=")) {
-        const [l, r] = target.split("=");
-        target = `(${l})-(${r})`;
+      const source = expr.includes("=") ? expr : expr;
+      if (source.includes("=")) {
+        const [l, r] = source.split("=");
+        const tokensL = tokenizeExpression(l);
+        const tokensR = tokenizeExpression(r);
+        target = `(${serializeForEval(tokensL)})-(${serializeForEval(tokensR)})`;
+      } else {
+        const tokens = tokenizeExpression(source);
+        target = serializeForEval(tokens);
       }
       const root = solveNewton(preprocess(target), Ans || 1, {
         mode: angleUnit,
@@ -786,20 +825,21 @@ export default function Calculator({
   }
 
   function insertFraction() {
-    // Insert just "/" — no auto "()" around the denominator. The parser already
-    // knows how to build a stacked fraction from "1/b" on its own; parens are
-    // only added when you type them yourself.
     if (expr) {
       const nextExpr = `${expr.slice(0, cursor)}/${expr.slice(cursor)}`;
+      const newCursor = cursor + 1;
       setExpr(nextExpr);
-      setCursor(cursor + 1);
+      setCursor(newCursor);
+      setForceDenEnd(cursorIsAtDenEnd(nextExpr, newCursor));
       return;
     }
     const startingValue =
       display !== "Math ERROR" && display !== "0" ? display : "";
     const nextExpr = `${startingValue}/`;
+    const newCursor = startingValue.length + 1;
     setExpr(nextExpr);
-    setCursor(startingValue.length + 1);
+    setCursor(newCursor);
+    setForceDenEnd(cursorIsAtDenEnd(nextExpr, newCursor));
     setError(false);
   }
 
@@ -845,11 +885,25 @@ export default function Calculator({
     }
 
     if (btn.id === "LEFT") {
-      setCursor((c) => Math.max(0, c - 1));
+      if (!forceDenEnd && cursorIsAtDenEnd(expr, cursor)) {
+        setForceDenEnd(true);
+        return;
+      }
+      if (cursor === 0) return;
+      const nc = cursor - 1;
+      setCursor(nc);
+      setForceDenEnd(cursorIsAtDenEnd(expr, nc));
       return;
     }
     if (btn.id === "RIGHT") {
-      setCursor((c) => Math.min(expr.length, c + 1));
+      if (forceDenEnd) {
+        setForceDenEnd(false);
+        return;
+      }
+      if (cursor >= expr.length) return;
+      const nc = cursor + 1;
+      setCursor(nc);
+      setForceDenEnd(false);
       return;
     }
     if (btn.id === "UP") {
@@ -858,7 +912,9 @@ export default function Calculator({
         cursor,
         (t) => cursor > t.numStart && cursor <= t.denEnd,
       );
-      setCursor(current ? current.numStart : 0);
+      const nc = current ? current.numStart : 0;
+      setCursor(nc);
+      setForceDenEnd(false);
       return;
     }
     if (btn.id === "DOWN") {
@@ -867,7 +923,9 @@ export default function Calculator({
         cursor,
         (t) => cursor >= t.numStart && cursor < t.denEnd,
       );
-      setCursor(current ? current.denStart : expr.length);
+      const nc = current ? current.denStart : expr.length;
+      setCursor(nc);
+      setForceDenEnd(cursorIsAtDenEnd(expr, nc));
       return;
     }
     if (btn.id === "MENU") {
@@ -911,7 +969,9 @@ export default function Calculator({
 
     if (btn.id === "STO") {
       try {
-        const v = calcEvaluate(preprocess(expr || String(Ans)), {
+        const tokens = tokenizeExpression(expr || String(Ans));
+        const serialized = serializeForEval(tokens);
+        const v = calcEvaluate(preprocess(serialized || String(Ans)), {
           mode: angleUnit,
           complexMode,
           Ans,
@@ -927,7 +987,9 @@ export default function Calculator({
     }
     if (btn.id === "MPLUS") {
       try {
-        const v = calcEvaluate(preprocess(expr || String(Ans)), {
+        const tokens = tokenizeExpression(expr || String(Ans));
+        const serialized = serializeForEval(tokens);
+        const v = calcEvaluate(preprocess(serialized || String(Ans)), {
           mode: angleUnit,
           complexMode,
           Ans,
@@ -943,7 +1005,9 @@ export default function Calculator({
     }
     if (btn.id === "MMINUS") {
       try {
-        const v = calcEvaluate(preprocess(expr || String(Ans)), {
+        const tokens = tokenizeExpression(expr || String(Ans));
+        const serialized = serializeForEval(tokens);
+        const v = calcEvaluate(preprocess(serialized || String(Ans)), {
           mode: angleUnit,
           complexMode,
           Ans,
@@ -1038,7 +1102,6 @@ export default function Calculator({
     }
     return null;
   }
-
   const rows = [
     [
       {
@@ -1453,7 +1516,11 @@ export default function Calculator({
         {basicDisplayMode && (
           <>
             <div className="expr-line">
-              <ExpressionDisplay expr={expr} cursor={cursor} />
+              <ExpressionDisplay
+                expr={expr}
+                cursor={cursor}
+                forceDenEnd={forceDenEnd}
+              />
             </div>
             <div
               className={`result-line ${error ? "err" : ""} ${String(display).length > 12 ? "compact-result" : ""}`}
