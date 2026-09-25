@@ -29,7 +29,6 @@ const MODES = [
 ];
 
 function preprocess(expr) {
-  // Turn Casio-style infix "5 nCr 2" / "5 nPr 2" into function-call form nCr(5,2)/nPr(5,2)
   const opPattern = /([\w.]+|\([^()]*\))\s*(nCr|nPr)\s*([\w.]+|\([^()]*\))/g;
   let prev;
   let out = expr;
@@ -39,6 +38,14 @@ function preprocess(expr) {
     out = out.replace(opPattern, (m, a, op, b) => `${op}(${a},${b})`);
     guard++;
   } while (out !== prev && guard < 10);
+
+  // Implicit multiplication: "5sqrt(9)" → "5*sqrt(9)", "(2)(3)" → "(2)*(3)"
+  out = out.replace(/\)\s*(?=[A-Za-z\d(])/g, ")*");
+  out = out.replace(
+    /(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)\s*(?=[A-Za-z(])/g,
+    "$1*",
+  );
+
   return out;
 }
 
@@ -208,36 +215,359 @@ function NaturalDisplay({ value, className = "", isResult = false }) {
   }
 }
 
-function FractionExpression({ value, cursor }) {
-  const slashIndex = value.indexOf("/");
-  if (slashIndex < 0) return null;
-  const numerator = value.slice(0, slashIndex) || "";
-  const denominator = value.slice(slashIndex + 1) || "";
-  const cursorInNumerator = cursor <= slashIndex;
-  const numeratorCursor = cursorInNumerator ? cursor : numerator.length;
-  const denominatorCursor = cursorInNumerator
-    ? -1
-    : Math.max(0, cursor - slashIndex - 1);
+// ---------------------------------------------------------------------------
+// Natural (Casio-style) inline display — recursive precedence parser.
+// ---------------------------------------------------------------------------
+
+function isDigitChar(ch) {
+  return typeof ch === "string" && ch >= "0" && ch <= "9";
+}
+function isIdentChar(ch) {
+  return typeof ch === "string" && /[A-Za-z_]/.test(ch);
+}
+
+function matchParenForward(expr, start) {
+  let depth = 0;
+  for (let i = start; i < expr.length; i++) {
+    if (expr[i] === "(") depth++;
+    else if (expr[i] === ")") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+function isUnaryAt(expr, i) {
+  if (i <= 0) return true;
+  const prev = expr[i - 1];
+  return "+-*/^(,".includes(prev);
+}
+
+function findOperandStart(expr, end) {
+  let i = end;
+  if (i <= 0) return -1;
+  if (expr[i - 1] === ")") {
+    let depth = 0;
+    let j = i - 1;
+    for (; j >= 0; j--) {
+      if (expr[j] === ")") depth++;
+      else if (expr[j] === "(") {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    if (j < 0) return -1;
+    while (j > 0 && isIdentChar(expr[j - 1])) j--;
+    return j;
+  }
+  let j = i;
+  while (
+    j > 0 &&
+    (isDigitChar(expr[j - 1]) ||
+      expr[j - 1] === "." ||
+      isIdentChar(expr[j - 1]))
+  ) {
+    j--;
+  }
+  if (j === i) return -1;
+  if (j > 0 && expr[j - 1] === "-" && isUnaryAt(expr, j - 1)) j--;
+  return j;
+}
+
+function findDenominatorEnd(expr, start) {
+  let depth = 0;
+  for (let i = start; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      if (depth > 0) depth--;
+    } else if (depth === 0) {
+      if (ch === "*") return i;
+      if ((ch === "+" || ch === "-") && i > start && !isUnaryAt(expr, i)) {
+        return i;
+      }
+    }
+  }
+  return expr.length;
+}
+
+function findTopLevelAddSub(expr) {
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      if (depth > 0) depth--;
+    } else if (
+      depth === 0 &&
+      (ch === "+" || ch === "-") &&
+      !isUnaryAt(expr, i)
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function findTopLevelMulDiv(expr) {
+  let depth = 0;
+  for (let i = 0; i < expr.length; i++) {
+    const ch = expr[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      if (depth > 0) depth--;
+    } else if (depth === 0 && (ch === "*" || ch === "/")) {
+      return { index: i, op: ch };
+    }
+  }
+  return null;
+}
+
+function tokenizeFactor(expr, offset) {
+  const tokens = [];
+  let i = 0;
+  while (i < expr.length) {
+    const parenIdx = expr.indexOf("(", i);
+    if (parenIdx === -1) {
+      if (i < expr.length) {
+        tokens.push({
+          type: "text",
+          start: offset + i,
+          end: offset + expr.length,
+          value: expr.slice(i),
+        });
+      }
+      break;
+    }
+    if (parenIdx > i) {
+      tokens.push({
+        type: "text",
+        start: offset + i,
+        end: offset + parenIdx,
+        value: expr.slice(i, parenIdx),
+      });
+    }
+    const end = matchParenForward(expr, parenIdx);
+    if (end === -1) {
+      tokens.push({
+        type: "text",
+        start: offset + parenIdx,
+        end: offset + parenIdx + 1,
+        value: "(",
+      });
+      tokens.push(
+        ...tokenizeExpression(expr.slice(parenIdx + 1), offset + parenIdx + 1),
+      );
+      break;
+    }
+    tokens.push({
+      type: "text",
+      start: offset + parenIdx,
+      end: offset + parenIdx + 1,
+      value: "(",
+    });
+    tokens.push(
+      ...tokenizeExpression(
+        expr.slice(parenIdx + 1, end - 1),
+        offset + parenIdx + 1,
+      ),
+    );
+    tokens.push({
+      type: "text",
+      start: offset + end - 1,
+      end: offset + end,
+      value: ")",
+    });
+    i = end;
+  }
+  return tokens;
+}
+
+function mergeAdjacentText(tokens) {
+  const out = [];
+  for (const tok of tokens) {
+    const prev = out[out.length - 1];
+    if (
+      tok.type === "text" &&
+      prev &&
+      prev.type === "text" &&
+      prev.end === tok.start
+    ) {
+      out[out.length - 1] = {
+        type: "text",
+        start: prev.start,
+        end: tok.end,
+        value: prev.value + tok.value,
+      };
+    } else {
+      out.push(tok);
+    }
+  }
+  return out;
+}
+
+function tokenizeExpression(expr, offset = 0) {
+  if (!expr) return [];
+
+  const addSubIdx = findTopLevelAddSub(expr);
+  if (addSubIdx !== -1) {
+    return mergeAdjacentText([
+      ...tokenizeExpression(expr.slice(0, addSubIdx), offset),
+      {
+        type: "text",
+        start: offset + addSubIdx,
+        end: offset + addSubIdx + 1,
+        value: expr[addSubIdx],
+      },
+      ...tokenizeExpression(expr.slice(addSubIdx + 1), offset + addSubIdx + 1),
+    ]);
+  }
+
+  const mulDiv = findTopLevelMulDiv(expr);
+  if (mulDiv && mulDiv.op === "/") {
+    let numStart = findOperandStart(expr, mulDiv.index);
+    if (numStart === -1) numStart = mulDiv.index;
+    const denEnd = findDenominatorEnd(expr, mulDiv.index + 1);
+    const numerator = tokenizeExpression(
+      expr.slice(numStart, mulDiv.index),
+      offset + numStart,
+    );
+    const denominator = tokenizeExpression(
+      expr.slice(mulDiv.index + 1, denEnd),
+      offset + mulDiv.index + 1,
+    );
+    return mergeAdjacentText([
+      ...tokenizeExpression(expr.slice(0, numStart), offset),
+      {
+        type: "fraction",
+        start: offset + numStart,
+        end: offset + denEnd,
+        numStart: offset + numStart,
+        numEnd: offset + mulDiv.index,
+        denStart: offset + mulDiv.index + 1,
+        denEnd: offset + denEnd,
+        numerator,
+        denominator,
+      },
+      ...tokenizeExpression(expr.slice(denEnd), offset + denEnd),
+    ]);
+  } else if (mulDiv && mulDiv.op === "*") {
+    return mergeAdjacentText([
+      ...tokenizeExpression(expr.slice(0, mulDiv.index), offset),
+      {
+        type: "text",
+        start: offset + mulDiv.index,
+        end: offset + mulDiv.index + 1,
+        value: "*",
+      },
+      ...tokenizeExpression(
+        expr.slice(mulDiv.index + 1),
+        offset + mulDiv.index + 1,
+      ),
+    ]);
+  }
+
+  return mergeAdjacentText(tokenizeFactor(expr, offset));
+}
+
+// Find the token the caret belongs to. Primary: strict half-open containment
+// (`start <= cursor < end`). Fallback: an empty-denominator fraction whose
+// blank denominator slot sits at exactly `cursor` — this is what lets DOWN
+// drop the caret into a blank denominator instead of escaping past the
+// fraction to a trailing position.
+function findCaretIndex(items, cursor) {
+  if (items.length === 0) return -1;
+  const strict = items.findIndex((t) => cursor >= t.start && cursor < t.end);
+  if (strict !== -1) return strict;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const t = items[i];
+    if (
+      t.type === "fraction" &&
+      t.denStart === t.denEnd &&
+      cursor === t.denStart
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function RenderItems({ items, cursor, caretClass = "caret" }) {
+  const hasCursor = cursor !== null && cursor !== undefined;
+  const caretIndex = hasCursor ? findCaretIndex(items, cursor) : -1;
+  const renderTrailingCaret =
+    hasCursor && caretIndex === -1 && items.length > 0;
 
   return (
-    <span className="fraction-editor">
-      <span className="fraction-part">
-        {displayExpression(numerator.slice(0, numeratorCursor))}
-        {cursorInNumerator && <span className="fraction-caret" />}
-        {displayExpression(numerator.slice(numeratorCursor))}
-      </span>
-      <span className="fraction-rule" />
-      <span className="fraction-part">
-        {displayExpression(
-          denominator.slice(0, denominatorCursor < 0 ? 0 : denominatorCursor),
-        )}
-        {denominatorCursor >= 0 && <span className="fraction-caret" />}
-        {displayExpression(
-          denominator.slice(denominatorCursor < 0 ? 0 : denominatorCursor),
-        )}
-      </span>
-    </span>
+    <>
+      {items.length === 0 && hasCursor && <span className={caretClass} />}
+
+      {items.map((tok, i) => {
+        const showCaret = i === caretIndex;
+        if (tok.type === "text") {
+          if (!showCaret) return <NaturalDisplay key={i} value={tok.value} />;
+          const local = cursor - tok.start;
+          return (
+            <React.Fragment key={i}>
+              <NaturalDisplay value={tok.value.slice(0, local)} />
+              <span className={caretClass} />
+              <NaturalDisplay value={tok.value.slice(local)} />
+            </React.Fragment>
+          );
+        }
+        const numCursor = showCaret && cursor <= tok.numEnd ? cursor : null;
+        const denCursor = showCaret && cursor > tok.numEnd ? cursor : null;
+        return (
+          <span className="fraction-editor" key={i}>
+            <span className="fraction-part">
+              <RenderItems
+                items={tok.numerator}
+                cursor={numCursor}
+                caretClass="fraction-caret"
+              />
+            </span>
+            <span className="fraction-rule" />
+            <span className="fraction-part">
+              <RenderItems
+                items={tok.denominator}
+                cursor={denCursor}
+                caretClass="fraction-caret"
+              />
+            </span>
+          </span>
+        );
+      })}
+
+      {renderTrailingCaret && <span className={caretClass} />}
+    </>
   );
+}
+
+function ExpressionDisplay({ expr, cursor }) {
+  const tokens = tokenizeExpression(expr);
+  return <RenderItems items={tokens} cursor={cursor} caretClass="caret" />;
+}
+
+function findDeepestFraction(items, cursor, containsFn) {
+  for (const tok of items) {
+    if (tok.type !== "fraction") continue;
+    if (containsFn(tok)) {
+      const deeper =
+        findDeepestFraction(tok.numerator, cursor, containsFn) ||
+        findDeepestFraction(tok.denominator, cursor, containsFn);
+      return deeper || tok;
+    }
+  }
+  return null;
+}
+
+function endsWithCompletedFraction(expr) {
+  if (!expr) return false;
+  const tokens = tokenizeExpression(expr);
+  const last = tokens[tokens.length - 1];
+  if (!last || last.type !== "fraction") return false;
+  return last.end === expr.length && last.denEnd > last.denStart;
 }
 
 export default function Calculator({
@@ -265,9 +595,29 @@ export default function Calculator({
   const basicDisplayMode = mode === "COMP" || mode === "CMPLX";
 
   function insert(text) {
-    const newExpr = expr.slice(0, cursor) + text + expr.slice(cursor);
+    let implicit = "";
+    // If the user types a letter (start of a function name like sqrt, sin, ln)
+    // right after a completed fraction at the end of the expression, insert
+    // an implicit "*" so the function becomes a SEPARATE operand instead of
+    // extending the denominator:
+    //   "77/88" + "sqrt("  →  "77/88*sqrt("   → displays 77/88 × √(
+    //   "77/88" + "8"      →  "77/888"        → digits still extend denom
+    if (cursor === expr.length && expr.length > 0 && /^[A-Za-z]/.test(text)) {
+      const tokens = tokenizeExpression(expr);
+      const last = tokens[tokens.length - 1];
+      if (
+        last &&
+        last.type === "fraction" &&
+        last.end === expr.length &&
+        last.denEnd > last.denStart
+      ) {
+        implicit = "*";
+      }
+    }
+    const newExpr =
+      expr.slice(0, cursor) + implicit + text + expr.slice(cursor);
     setExpr(newExpr);
-    setCursor(cursor + text.length);
+    setCursor(cursor + implicit.length + text.length);
   }
 
   function backspace() {
@@ -304,17 +654,58 @@ export default function Calculator({
 
   function classifyError(expr, error) {
     const msg = String(error?.message || error || "");
-    const hasLetter = /[A-Za-z]/.test(expr);
+    const src = String(expr || "");
+
+    // --- 1) Syntax errors ------------------------------------------------
+    // Either the engine complained about structure, OR the raw expression
+    // is obviously incomplete (unbalanced parens, dangling operator, ...).
+    const engineSaysSyntax =
+      /(Unexpected end|Unexpected operator|Unexpected part|Unexpected type|Parenthesis|Value expected|Character .* is not allowed|Syntax|Unexpected token|Value expected)/i.test(
+        msg,
+      );
+
+    const parensUnbalanced = (() => {
+      let depth = 0;
+      for (const ch of src) {
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+        if (depth < 0) return true; // stray ")"
+      }
+      return depth !== 0; // unclosed "("
+    })();
+
+    const endsWithOperator = /[+\-*/^(,]$/.test(src.trim());
+    const endsWithFunctionName =
+      /\b(?:sin|cos|tan|asin|acos|atan|sinh|cosh|tanh|asinh|acosh|atanh|sqrt|cbrt|log10|ln|exp|abs|dms|pol|rec|round|sum|integral|randomInt|Ran)$/i.test(
+        src.trim(),
+      );
+
+    if (
+      engineSaysSyntax ||
+      parensUnbalanced ||
+      endsWithOperator ||
+      endsWithFunctionName
+    ) {
+      return "Syntax ERROR";
+    }
+
+    // --- 2) Variable errors ---------------------------------------------
+    const hasLetter = /[A-Za-z]/.test(src);
     const isVariableIssue =
       /(Undefined symbol|Unknown symbol|is not defined|not defined|Variable)/i.test(
         msg,
-      ) || /\b(?:A|B|C|D|E|F|X|Y|Z|a|b|c|d|e|f|x|y|z)\b/.test(expr);
-    return hasLetter && isVariableIssue ? "Variable Error" : "Math ERROR";
+      ) || /\b(?:A|B|C|D|E|F|X|Y|Z|a|b|c|d|e|f|x|y|z)\b/.test(src);
+    if (hasLetter && isVariableIssue) return "Variable Error";
+
+    // --- 3) Everything else ---------------------------------------------
+    // Divide by zero, domain errors (sqrt(-1), log(0), ...), overflow, etc.
+    return "Math ERROR";
   }
 
   function doEvaluate() {
+    let clean;
     try {
-      const clean = preprocess(expr || "0");
+      clean = preprocess(expr || "0");
       const result = calcEvaluate(clean, {
         mode: angleUnit,
         complexMode,
@@ -331,14 +722,15 @@ export default function Calculator({
       setError(false);
       pushHistory(expr, shown);
     } catch (e) {
-      setDisplay(classifyError(clean, e));
+      setDisplay(classifyError(clean ?? expr, e));
       setError(true);
     }
   }
 
   function doSolve() {
+    let target;
     try {
-      let target = expr;
+      target = expr;
       if (target.includes("=")) {
         const [l, r] = target.split("=");
         target = `(${l})-(${r})`;
@@ -351,7 +743,7 @@ export default function Calculator({
       pushHistory(`SOLVE: ${expr}`, root);
       setError(false);
     } catch (e) {
-      setDisplay(classifyError(target, e));
+      setDisplay(classifyError(target ?? expr, e));
       setError(true);
     }
   }
@@ -394,17 +786,20 @@ export default function Calculator({
   }
 
   function insertFraction() {
+    // Insert just "/" — no auto "()" around the denominator. The parser already
+    // knows how to build a stacked fraction from "1/b" on its own; parens are
+    // only added when you type them yourself.
     if (expr) {
-      const nextExpr = `${expr.slice(0, cursor)}/()${expr.slice(cursor)}`;
+      const nextExpr = `${expr.slice(0, cursor)}/${expr.slice(cursor)}`;
       setExpr(nextExpr);
-      setCursor(cursor + 2);
+      setCursor(cursor + 1);
       return;
     }
     const startingValue =
       display !== "Math ERROR" && display !== "0" ? display : "";
-    const nextExpr = `${startingValue}/()`;
+    const nextExpr = `${startingValue}/`;
     setExpr(nextExpr);
-    setCursor(startingValue.length + 2);
+    setCursor(startingValue.length + 1);
     setError(false);
   }
 
@@ -458,18 +853,25 @@ export default function Calculator({
       return;
     }
     if (btn.id === "UP") {
-      const fractionSlash = expr.indexOf("/");
-      setCursor(fractionSlash >= 0 ? fractionSlash : 0);
+      const current = findDeepestFraction(
+        tokenizeExpression(expr),
+        cursor,
+        (t) => cursor > t.numStart && cursor <= t.denEnd,
+      );
+      setCursor(current ? current.numStart : 0);
       return;
     }
     if (btn.id === "DOWN") {
-      const fractionSlash = expr.indexOf("/");
-      setCursor(fractionSlash >= 0 ? fractionSlash + 1 : expr.length);
+      const current = findDeepestFraction(
+        tokenizeExpression(expr),
+        cursor,
+        (t) => cursor >= t.numStart && cursor < t.denEnd,
+      );
+      setCursor(current ? current.denStart : expr.length);
       return;
     }
     if (btn.id === "MENU") {
       if (shiftActive) {
-        // SHIFT+MENU = SETUP -> cycle angle unit
         setAngleUnit((u) =>
           u === "DEG" ? "RAD" : u === "RAD" ? "GRAD" : "DEG",
         );
@@ -1051,15 +1453,7 @@ export default function Calculator({
         {basicDisplayMode && (
           <>
             <div className="expr-line">
-              {expr.includes("/") ? (
-                <FractionExpression value={expr} cursor={cursor} />
-              ) : (
-                <>
-                  <NaturalDisplay value={expr.slice(0, cursor)} />
-                  <span className="caret" />
-                  <NaturalDisplay value={expr.slice(cursor)} />
-                </>
-              )}
+              <ExpressionDisplay expr={expr} cursor={cursor} />
             </div>
             <div
               className={`result-line ${error ? "err" : ""} ${String(display).length > 12 ? "compact-result" : ""}`}

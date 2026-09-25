@@ -64,6 +64,10 @@
 }
 .status-row span { font-weight: 700 !important; opacity: .78; }
 .status-row span.active { font-weight: 700 !important; opacity: 1; color: #111; }
+
+/* --- Expression line --------------------------------------------------- */
+/* Flex row with align-items:center is what puts the trailing caret at the
+   same vertical middle the fraction bar sits at (Casio-like). */
 .expr-line {
   /* Manual typing size: change font-size for the expression being entered. */
   font-size: 20px;
@@ -71,7 +75,12 @@
   flex: 1;
   word-break: break-all;
   color: #101010;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 1px;
 }
+
 .natural-display { display: inline-block; color: #101010; vertical-align: middle; font-weight: 700; line-height: 1; }
 .expr-line .natural-display { font-size: 21px; } /* Manual typed-expression size. */
 .result-line .natural-display { font-size: 24px; } /* Manual answer size. */
@@ -82,17 +91,51 @@
 .mixed-whole { display: inline-block; }
 .mixed-part { display: inline-flex; flex-direction: column; align-items: stretch; min-width: 24px; text-align: center; font-size: .78em; line-height: 1.05; }
 .mixed-rule { display: block; height: 1px; margin: 2px 0; background: currentColor; }
-.fraction-editor { display: inline-flex; flex-direction: column; min-width: 28px; min-height: 42px; justify-content: center; vertical-align: middle; font-size: 23px; line-height: 21px; text-align: center; }
-.fraction-part { display: block; min-width: 24px; min-height: 17px; padding: 0 4px; }
-.fraction-rule { display: block; height: 1px; min-width: 28px; background: currentColor; }
-.fraction-caret { display: inline-block; width: 1px; height: 16px; background: currentColor; vertical-align: middle; animation: blink 1s step-end infinite; }
+
+/* ---- Stacked fraction (Casio natural display) -------------------------- */
+/* Sizes use em so nested fractions scale smoothly (0.88em per nesting level). */
+.fraction-editor {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  vertical-align: middle;
+  font-size: 0.9em;
+  line-height: 1.05;
+  text-align: center;
+  padding: 1px 4px;
+  margin: 0 2px;
+}
+.fraction-part {
+  display: block;
+  min-width: 1.1em;
+  min-height: 1em;
+  padding: 0 3px;
+  text-align: center;
+}
+.fraction-rule {
+  display: block;
+  height: 1px;
+  min-width: 1.4em;
+  margin: 1px 0;
+  background: currentColor;
+}
+.fraction-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  background: currentColor;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
 .fraction-placeholder { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 24px; height: 30px; vertical-align: middle; }
 .fraction-slot { width: 18px; height: 9px; border: 1px solid #7f9bb8; background: rgba(255, 255, 255, .2); }
 .fraction-bar { width: 22px; height: 1px; margin: 2px 0; background: #10240f; }
+
 .caret {
   display: inline-block;
   width: 1px;
-  height: 16px;
+  height: 1em;
   background: #152d27;
   animation: blink 1s step-end infinite;
   vertical-align: middle;
