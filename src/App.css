@@ -36,7 +36,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1 1 380px;
+  flex: 1 1 385px;
 }
 footer {
   margin-top: 24px;
