@@ -28,6 +28,45 @@ const MODES = [
   "VECTOR",
 ];
 
+const DELETABLE_TOKENS = [
+  "randomInt(",
+  "integral(",
+  "log10(",
+  "asinh(",
+  "acosh(",
+  "atanh(",
+  "asin(",
+  "acos(",
+  "atan(",
+  "sinh(",
+  "cosh(",
+  "tanh(",
+  "sqrt(",
+  "cbrt(",
+  "exp(",
+  "abs(",
+  "dms(",
+  "pol(",
+  "rec(",
+  "round(",
+  "sum(",
+  "Ran(",
+  "sin(",
+  "cos(",
+  "tan(",
+  "ln(",
+  "*10^",
+  "10^(",
+  "^(-1)",
+  "Ans",
+  "nCr",
+  "nPr",
+  "eng",
+  "^2",
+  "^3",
+  "/100",
+  "pi",
+].sort((a, b) => b.length - a.length);
 function preprocess(expr) {
   const opPattern = /([\w.]+|\([^()]*\))\s*(nCr|nPr)\s*([\w.]+|\([^()]*\))/g;
   let prev;
@@ -653,11 +692,51 @@ export default function Calculator({
     setCursor(newCursor);
     setForceDenEnd(cursorIsAtDenEnd(newExpr, newCursor));
   }
-
   function backspace() {
     if (cursor === 0) return;
-    const newExpr = expr.slice(0, cursor - 1) + expr.slice(cursor);
-    const newCursor = cursor - 1;
+
+    const before = expr.slice(0, cursor);
+
+    // ---- DEBUG: dump exact char codes so nothing hidden can hide ----
+    // eslint-disable-next-line no-console
+    console.log("=== DEL ===");
+    // eslint-disable-next-line no-console
+    console.log("expr  :", JSON.stringify(expr));
+    // eslint-disable-next-line no-console
+    console.log("cursor:", cursor);
+    // eslint-disable-next-line no-console
+    console.log("before:", JSON.stringify(before));
+    // eslint-disable-next-line no-console
+    console.log(
+      "tail codes:",
+      Array.from(before.slice(-6)).map((ch) => `${ch}:${ch.charCodeAt(0)}`),
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      "endsWith('cos(') =",
+      before.endsWith("cos("),
+      " endsWith('sin(') =",
+      before.endsWith("sin("),
+      " endsWith('tan(') =",
+      before.endsWith("tan("),
+      " endsWith('eng') =",
+      before.endsWith("eng"),
+    );
+    // ----------------------------------------------------------------
+
+    let removeLength = 1;
+    for (const t of DELETABLE_TOKENS) {
+      if (before.endsWith(t)) {
+        removeLength = t.length;
+        // eslint-disable-next-line no-console
+        console.log("matched token:", JSON.stringify(t));
+        break;
+      }
+    }
+
+    const newExpr = expr.slice(0, cursor - removeLength) + expr.slice(cursor);
+    const newCursor = cursor - removeLength;
+
     setExpr(newExpr);
     setCursor(newCursor);
     setForceDenEnd(cursorIsAtDenEnd(newExpr, newCursor));
@@ -862,6 +941,16 @@ export default function Calculator({
       setAlphaActive((v) => !v);
       return;
     }
+
+    // ALPHA + key → insert the alpha symbol.
+    // This MUST come before the HYP toggle so ALPHA+HYP inserts "C"
+    // instead of toggling hypActive.
+    if (alphaActive && btn.alpha) {
+      insert(btn.alpha);
+      setAlphaActive(false);
+      return;
+    }
+
     if (btn.id === "HYP") {
       if (shiftActive && btn.shiftAction) {
         btn.shiftAction();
@@ -869,12 +958,6 @@ export default function Calculator({
         return;
       }
       setHypActive((v) => !v);
-      return;
-    }
-
-    if (alphaActive && btn.alpha) {
-      insert(btn.alpha);
-      setAlphaActive(false);
       return;
     }
 
