@@ -2355,6 +2355,7 @@ export default function Calculator({
         )}
       </div>
 
+      {/* ================= TOP CONTROLS (Now 2 Rows) ================= */}
       <div className="top-controls">
         <button className="key k-shift" onClick={() => press({ id: "SHIFT" })}>
           SHIFT
@@ -2362,6 +2363,7 @@ export default function Calculator({
         <button className="key k-alpha" onClick={() => press({ id: "ALPHA" })}>
           ALPHA
         </button>
+
         <div className="replay-pad">
           <button className="replay-up" onClick={() => press({ id: "UP" })}>
             ▲
@@ -2380,19 +2382,54 @@ export default function Calculator({
             ▼
           </button>
         </div>
+
         <button className="key k-fn" onClick={() => press({ id: "MENU" })}>
           MODE
         </button>
         <button className="key k-on" onClick={() => press({ id: "ON" })}>
           ON
         </button>
+
+        {/* 👇 INSERTED: The 4-key row (CALC, ∫dx, x⁻¹, log□) mapped directly into the grid 👇 */}
+        {basicDisplayMode &&
+          rows[0] &&
+          rows[0].map((btn) => (
+            <button
+              key={btn.id}
+              className={`key ${btn.cls || ""} ${btn.disabled ? "disabled" : ""}`}
+              disabled={btn.disabled}
+              onClick={() => press(btn)}
+            >
+              {btn.topLabel && (
+                <span className="top-label">{btn.topLabel}</span>
+              )}
+              {btn.shiftLabel && (
+                <span className="shift-label">{btn.shiftLabel}</span>
+              )}
+              {btn.alphaLabel && (
+                <span className="alpha-label">{btn.alphaLabel}</span>
+              )}
+              <span className="main-label">
+                {btn.label !== undefined
+                  ? btn.label
+                  : btn.main === ""
+                    ? btn.id
+                    : btn.main.replace(/\($/, "")}
+              </span>
+            </button>
+          ))}
       </div>
 
+      {/* ================= MAIN KEYPAD ================= */}
       <div className="keypad">
         {rows
-          .filter(
-            (row) => basicDisplayMode || (row.length !== 4 && row.length !== 6),
-          )
+          .filter((row) => {
+            // 👇 UPDATED: Exclude the 4-key row from the main keypad in basic mode,
+            // because we just moved it into top-controls above.
+            if (basicDisplayMode && row.length === 4) return false;
+
+            return basicDisplayMode || (row.length !== 4 && row.length !== 6);
+          })
           .map((row, ri) => (
             <div
               className={`keypad-row keypad-row-${row.length}`}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Calculator from "./components/Calculator";
-import History from "./components/History";
+
 import { saveHistory } from "./api";
 import "./components/Calculator.css";
 
@@ -8,7 +8,6 @@ export default function App() {
   const [mode, setMode] = useState("COMP");
   const [angleUnit, setAngleUnit] = useState("DEG");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showHistory, setShowHistory] = useState(true);
 
   async function handleResult(entry) {
     try {
@@ -20,29 +19,14 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <div className="app-header">
-        <h1></h1>
-        <div className="header-actions">
-          <button onClick={() => setShowHistory((v) => !v)}>
-            {showHistory ? "Hide" : "Show"} History
-          </button>
-        </div>
-      </div>
-      <div className="app-main">
-        <div className="calc-column">
-          <div className="calc-shell">
-            <Calculator
-              mode={mode}
-              setMode={setMode}
-              angleUnit={angleUnit}
-              setAngleUnit={setAngleUnit}
-              onResult={handleResult}
-            />
-          </div>
-        </div>
-        {showHistory && <History refreshKey={refreshKey} />}
-      </div>
+    <div className="calc-shell">
+      <Calculator
+        mode={mode}
+        setMode={setMode}
+        angleUnit={angleUnit}
+        setAngleUnit={setAngleUnit}
+        onResult={handleResult}
+      />
     </div>
   );
 }
