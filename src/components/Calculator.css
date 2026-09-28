@@ -66,12 +66,6 @@ body {
   text-align: center; color: #d9d9d9;
   padding: calc(var(--w) * 0.0095) calc(var(--w) * 0.0143) 0;
 }
-.brand-name {
-  display: block; width: 100%; text-align: center; color: #fff;
-  font: 800 calc(var(--w) * 0.0476) Georgia, serif;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, .35);
-  margin: 2px 0; line-height: 2;
-}
 
 /* ============================================================
    LCD DISPLAY
@@ -762,4 +756,10 @@ body {
   /* Override the default min-height (0.0976) with a taller value. 
      Try 0.11 or 0.115 to make them noticeably taller. */
   min-height: calc(var(--w) * 0.11);
+}
+.brand-name {
+  display: block; width: 100%; text-align: center; color: #fff;
+  font: 800 calc(var(--w) * 0.0476) Georgia, serif;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+  margin: 8px 0; line-height: 1.2;
 }
