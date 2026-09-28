@@ -755,3 +755,11 @@ body {
   z-index: 29;      /* BELOW all menus (30 / 40 / 45) */
   cursor: pointer;
 }
+/* ============================================================
+   INCREASE KEYPAD-ROW-5 BUTTON HEIGHT
+   ============================================================ */
+.keypad-row-5 .key {
+  /* Override the default min-height (0.0976) with a taller value. 
+     Try 0.11 or 0.115 to make them noticeably taller. */
+  min-height: calc(var(--w) * 0.11);
+}
