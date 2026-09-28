@@ -68,8 +68,9 @@ body {
 }
 .brand-name {
   display: block; width: 100%; text-align: center; color: #fff;
-  font: italic 700 calc(var(--w) * 0.0476) Georgia, serif;
+  font: 800 calc(var(--w) * 0.0476) Georgia, serif;
   text-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+  margin: 2px 0; line-height: 2;
 }
 
 /* ============================================================
